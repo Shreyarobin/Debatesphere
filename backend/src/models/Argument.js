@@ -36,6 +36,10 @@ const argumentSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  stanceMismatch: {
+    type: Boolean,
+    default: false,
+  },
   round: {
     type: Number,
     default: 1,

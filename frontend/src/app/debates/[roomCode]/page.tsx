@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { getSocket } from '@/lib/socket';
 import api from '@/lib/axios';
+import PrepChatbot from './PrepChatbot';
 
 interface ArgumentItem {
   _id: string;
@@ -14,6 +15,7 @@ interface ArgumentItem {
   aiScore: number | null;
   fallacyDetected?: string | null;
   scoringExplanation?: string | null;
+  stanceMismatch?: boolean;
   voteCount?: number;
   createdAt: string;
 }
@@ -48,9 +50,9 @@ export default function DebateRoomPage() {
       setArguments((prev) => [...prev, { ...arg, voteCount: 0 }]);
     });
 
-    socket.on('argument_scored', ({ argumentId, score, fallacy, explanation }) => {
+    socket.on('argument_scored', ({ argumentId, score, fallacy, explanation, stanceMismatch }) => {
       setArguments((prev) =>
-        prev.map((a) => a._id === argumentId ? { ...a, aiScore: score, fallacyDetected: fallacy, scoringExplanation: explanation } : a)
+        prev.map((a) => a._id === argumentId ? { ...a, aiScore: score, fallacyDetected: fallacy, scoringExplanation: explanation, stanceMismatch } : a)
       );
     });
 
@@ -206,6 +208,8 @@ export default function DebateRoomPage() {
           </button>
         </div>
       </div>
+
+      {debate && <PrepChatbot topic={debate.title} side={side} />}
     </div>
   );
 }
@@ -213,16 +217,24 @@ export default function DebateRoomPage() {
 function ArgumentCard({ arg, onVote }: { arg: ArgumentItem; onVote: (id: string) => void }) {
   return (
     <div className={`rounded-lg p-3 border ${
-      arg.side === 'for'
+      arg.stanceMismatch
+        ? 'bg-purple-950/30 border-purple-700/40'
+        : arg.side === 'for'
         ? 'bg-green-950/30 border-green-900/20'
         : 'bg-red-950/30 border-red-900/20'
     }`}>
+      {arg.stanceMismatch && (
+        <div className="flex items-center gap-1 mb-2 text-purple-400 text-xs font-medium">
+          🚫 Wrong side — this argues the opposite position
+        </div>
+      )}
       <p className="text-gray-200 text-sm mb-2">{arg.content}</p>
       <div className="flex justify-between items-center flex-wrap gap-2">
         <span className="text-gray-500 text-xs">@{arg.author?.username}</span>
         <div className="flex items-center gap-2 flex-wrap">
           {arg.aiScore !== null && arg.aiScore !== undefined ? (
             <span className={`text-xs px-2 py-0.5 rounded-full ${
+              arg.stanceMismatch ? 'bg-purple-900/50 text-purple-400' :
               arg.aiScore >= 7 ? 'bg-green-900/50 text-green-400' :
               arg.aiScore >= 4 ? 'bg-yellow-900/50 text-yellow-400' :
               'bg-red-900/50 text-red-400'

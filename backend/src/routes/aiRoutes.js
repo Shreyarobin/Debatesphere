@@ -7,7 +7,7 @@ const Argument = require('../models/Argument');
 
 router.post('/prep-chat', protect, async (req, res) => {
   const { topic, side, message } = req.body;
-  await streamDebatePrepChat(topic, side, message, res);
+  await streamDebatePrepChat(topic, side, message, res, req.user._id);
 });
 
 router.post('/score/:argumentId', protect, async (req, res) => {
@@ -19,11 +19,12 @@ router.post('/score/:argumentId', protect, async (req, res) => {
 
     if (!argument) return res.status(404).json({ message: 'Argument not found.' });
 
-    const result = await scoreArgument(argument.content, argument.debate.title);
+    const result = await scoreArgument(argument.content, argument.debate.title, argument.side);
 
     argument.aiScore = result.score;
     argument.fallacyDetected = result.fallacy;
     argument.scoringExplanation = result.explanation;
+    argument.stanceMismatch = result.stanceMismatch || false;
     await argument.save();
 
     res.json(result);

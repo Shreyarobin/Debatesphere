@@ -77,6 +77,9 @@ export default function DebatesPage() {
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <h1 className="text-2xl font-bold">DebateSphere</h1>
           <div className="flex items-center gap-4">
+            <button onClick={() => router.push('/matches')} className="text-purple-400 hover:text-purple-300 text-sm transition-colors">
+              Competitive Mode →
+            </button>
             <span className="text-gray-400">Hello, {user?.username}</span>
             <button onClick={logout} className="text-gray-400 hover:text-white transition-colors">
               Logout

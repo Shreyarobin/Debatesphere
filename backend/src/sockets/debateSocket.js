@@ -1,6 +1,7 @@
 const Argument = require('../models/Argument');
 const Vote = require('../models/Vote');
 const Debate = require('../models/Debate');
+const { scoreArgument } = require('../services/openaiService');
 
 const debateSocket = (io) => {
   io.on('connection', (socket) => {
@@ -33,6 +34,28 @@ const debateSocket = (io) => {
           createdAt: argument.createdAt,
         });
 
+        const debate = await Debate.findById(debateId);
+console.log('DEBUG - debate:', debate ? debate.title : 'NULL DEBATE');
+console.log('DEBUG - side:', side);
+if (process.env.GROQ_API_KEY) {
+  scoreArgument(content, debate.title, side).then(async (result) => {
+    argument.aiScore = result.score;
+    argument.fallacyDetected = result.fallacy;
+    argument.scoringExplanation = result.explanation;
+    argument.stanceMismatch = result.stanceMismatch || false;
+    await argument.save();
+
+    io.to(roomCode).emit('argument_scored', {
+      argumentId: argument._id,
+      score: result.score,
+      fallacy: result.fallacy,
+      explanation: result.explanation,
+      stanceMismatch: result.stanceMismatch || false,
+    });
+  }).catch((err) => {
+    console.log('AI scoring failed:', err.message);
+  });
+}
       } catch (error) {
         socket.emit('error', { message: 'Failed to submit argument: ' + error.message });
       }

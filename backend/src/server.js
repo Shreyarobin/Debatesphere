@@ -10,7 +10,10 @@ const { createAdapter } = require('@socket.io/redis-adapter');
 const authRoutes = require('./routes/authRoutes');
 const debateRoutes = require('./routes/debateRoutes');
 const aiRoutes = require('./routes/aiRoutes');
+const matchRoutes = require('./routes/matchRoutes');
 const debateSocket = require('./sockets/debateSocket');
+const matchSocket = require('./sockets/matchSocket');
+const { initializeRAG } = require('./services/ragService');
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -21,6 +24,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/debates', debateRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/matches', matchRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'OK', timestamp: new Date() }));
 
@@ -32,6 +36,7 @@ const startServer = async () => {
   try {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('MongoDB connected');
+    await initializeRAG();
 
     const pubClient = createClient({ url: process.env.REDIS_URL });
     const subClient = pubClient.duplicate();
@@ -41,6 +46,7 @@ const startServer = async () => {
     io.adapter(createAdapter(pubClient, subClient));
 
     debateSocket(io);
+    matchSocket(io);
 
     const PORT = process.env.PORT || 5000;
     httpServer.listen(PORT, () => {
