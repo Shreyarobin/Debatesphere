@@ -160,4 +160,63 @@ Return ONLY a JSON object with exactly these fields:
   return JSON.parse(raw);
 };
 
-module.exports = { streamDebatePrepChat, scoreArgument, generateDebateSummary, judgeMatch };
+const getAIOpponentReply = async (topic, aiSide, conversationHistory) => {
+  const formattedHistory = conversationHistory
+    .map((m) => `${m.sender === 'user' ? 'USER' : 'AI'}: ${m.content}`)
+    .join('\n\n');
+
+  const response = await groq.chat.completions.create({
+    model: MODEL,
+    messages: [
+      {
+        role: 'system',
+        content: `You are debating ${aiSide.toUpperCase()} on the topic: "${topic}". You are a skilled, confident debater. Respond directly to the user's most recent point with a sharp rebuttal or counter-argument from your assigned side. Keep your response focused and punchy — 2-4 sentences, no preamble like "Great point" or "I understand your view". Get straight to your counter-argument.`,
+      },
+      {
+        role: 'user',
+        content: `Debate so far:\n\n${formattedHistory}\n\nRespond with your next rebuttal.`,
+      },
+    ],
+    max_tokens: 200,
+  });
+
+  return response.choices[0].message.content;
+};
+
+const generateSoloReport = async (topic, userSide, conversationHistory) => {
+  const formattedHistory = conversationHistory
+    .map((m) => `${m.sender === 'user' ? 'USER' : 'AI OPPONENT'}: ${m.content}`)
+    .join('\n\n');
+
+  const response = await groq.chat.completions.create({
+    model: MODEL,
+    response_format: { type: 'json_object' },
+    messages: [
+      {
+        role: 'system',
+        content: `You are an expert debate coach. The USER just finished a practice debate against an AI opponent, arguing the ${userSide.toUpperCase()} side of: "${topic}".
+
+Analyze ONLY the USER's messages (ignore the AI opponent's quality) and identify their strengths and weaknesses as a debater. Be specific and reference what they actually said.
+
+CRITICAL FORMATTING RULE: Every field must be valid, properly-quoted JSON. The "overallFeedback" field MUST be wrapped in double quotes as a single JSON string value, with no double quotation marks anywhere inside the text itself (use single quotes or no quotes when emphasizing words). Do not break the feedback across multiple unquoted lines. Each item inside "strengths" and "weaknesses" must also be a properly quoted JSON string with no internal double quotes.
+
+Return ONLY a valid JSON object with exactly these fields:
+{
+  "strengths": ["short strength 1", "short strength 2", "short strength 3"],
+  "weaknesses": ["short weakness 1", "short weakness 2", "short weakness 3"],
+  "overallFeedback": "3-4 sentences of holistic coaching feedback as ONE properly quoted JSON string, encouraging but honest"
+}`,
+      },
+      {
+        role: 'user',
+        content: `Full debate transcript:\n\n${formattedHistory}`,
+      },
+    ],
+    max_tokens: 500,
+  });
+
+  const raw = response.choices[0].message.content;
+  return JSON.parse(raw);
+};
+
+module.exports = { streamDebatePrepChat, scoreArgument, generateDebateSummary, judgeMatch, getAIOpponentReply, generateSoloReport };

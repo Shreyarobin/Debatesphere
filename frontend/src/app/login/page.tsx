@@ -19,7 +19,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      router.push('/debates');
+      router.push('/home');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed');
     } finally {

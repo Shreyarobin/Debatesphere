@@ -7,13 +7,26 @@ const debateSocket = (io) => {
   io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
 
-    socket.on('join_room', ({ roomCode, username }) => {
+    socket.on('join_room', ({ roomCode, username, isSpectator }) => {
       socket.join(roomCode);
-      console.log(`${username} joined room ${roomCode}`);
-      socket.to(roomCode).emit('user_joined', {
-        message: `${username} has joined the debate`,
-        timestamp: new Date(),
-      });
+      console.log(`${username} joined room ${roomCode}${isSpectator ? ' as spectator' : ''}`);
+
+      if (isSpectator) {
+        socket.to(roomCode).emit('user_joined', {
+          message: `${username} is now watching this debate`,
+          timestamp: new Date(),
+        });
+      } else {
+        socket.to(roomCode).emit('user_joined', {
+          message: `${username} has joined the debate`,
+          timestamp: new Date(),
+        });
+      }
+
+      // Broadcast updated population count to everyone in the room
+      const room = io.sockets.adapter.rooms.get(roomCode);
+      const roomSize = room ? room.size : 0;
+      io.to(roomCode).emit('room_population', { count: roomSize });
     });
 
     socket.on('submit_argument', async ({ roomCode, content, side, userId, debateId, username }) => {
@@ -35,27 +48,25 @@ const debateSocket = (io) => {
         });
 
         const debate = await Debate.findById(debateId);
-console.log('DEBUG - debate:', debate ? debate.title : 'NULL DEBATE');
-console.log('DEBUG - side:', side);
-if (process.env.GROQ_API_KEY) {
-  scoreArgument(content, debate.title, side).then(async (result) => {
-    argument.aiScore = result.score;
-    argument.fallacyDetected = result.fallacy;
-    argument.scoringExplanation = result.explanation;
-    argument.stanceMismatch = result.stanceMismatch || false;
-    await argument.save();
+        if (process.env.GROQ_API_KEY) {
+          scoreArgument(content, debate.title, side).then(async (result) => {
+            argument.aiScore = result.score;
+            argument.fallacyDetected = result.fallacy;
+            argument.scoringExplanation = result.explanation;
+            argument.stanceMismatch = result.stanceMismatch || false;
+            await argument.save();
 
-    io.to(roomCode).emit('argument_scored', {
-      argumentId: argument._id,
-      score: result.score,
-      fallacy: result.fallacy,
-      explanation: result.explanation,
-      stanceMismatch: result.stanceMismatch || false,
-    });
-  }).catch((err) => {
-    console.log('AI scoring failed:', err.message);
-  });
-}
+            io.to(roomCode).emit('argument_scored', {
+              argumentId: argument._id,
+              score: result.score,
+              fallacy: result.fallacy,
+              explanation: result.explanation,
+              stanceMismatch: result.stanceMismatch || false,
+            });
+          }).catch((err) => {
+            console.log('AI scoring failed:', err.message);
+          });
+        }
       } catch (error) {
         socket.emit('error', { message: 'Failed to submit argument: ' + error.message });
       }

@@ -1,6 +1,7 @@
 const Debate = require('../models/Debate');
 const Argument = require('../models/Argument');
 const Vote = require('../models/Vote');
+const { generateDebateSummary } = require('../services/openaiService');
 
 const createDebate = async (req, res) => {
   try {
@@ -94,10 +95,76 @@ const closeDebate = async (req, res) => {
     debate.closedAt = new Date();
     await debate.save();
 
+    // Generate AI summary in the background (don't block the response)
+    const forArguments = await Argument.find({ debate: debate._id, side: 'for' });
+    const againstArguments = await Argument.find({ debate: debate._id, side: 'against' });
+
+    if (forArguments.length > 0 || againstArguments.length > 0) {
+      generateDebateSummary(debate.title, forArguments, againstArguments)
+        .then(async (summary) => {
+          debate.aiSummary = summary;
+          await debate.save();
+        })
+        .catch((err) => console.log('Summary generation failed:', err.message));
+    }
+
     res.json({ message: 'Debate closed.', debate });
   } catch (error) {
     res.status(500).json({ message: 'Server error.', error: error.message });
   }
 };
 
-module.exports = { createDebate, getDebates, getDebateByRoom, joinDebate, getArguments, closeDebate };
+const getDebateStats = async (req, res) => {
+  try {
+    const debate = await Debate.findOne({ roomCode: req.params.roomCode.toUpperCase() })
+      .populate('participants.for', 'username')
+      .populate('participants.against', 'username');
+    if (!debate) return res.status(404).json({ message: 'Debate not found.' });
+
+    const forArgs = await Argument.find({ debate: debate._id, side: 'for' }).populate('author', 'username');
+    const againstArgs = await Argument.find({ debate: debate._id, side: 'against' }).populate('author', 'username');
+
+    const avgScore = (args) => {
+      const scored = args.filter((a) => a.aiScore !== null && a.aiScore !== undefined);
+      if (scored.length === 0) return null;
+      const sum = scored.reduce((acc, a) => acc + a.aiScore, 0);
+      return Math.round((sum / scored.length) * 10) / 10;
+    };
+
+    const allArgs = [...forArgs, ...againstArgs];
+    const argIds = allArgs.map((a) => a._id);
+    const voteCounts = await Vote.aggregate([
+      { $match: { argument: { $in: argIds } } },
+      { $group: { _id: '$argument', count: { $sum: 1 } } },
+    ]);
+
+    const voteMap = {};
+    voteCounts.forEach((v) => { voteMap[v._id.toString()] = v.count; });
+
+    let mostUpvoted = null;
+    let maxVotes = 0;
+    allArgs.forEach((a) => {
+      const count = voteMap[a._id.toString()] || 0;
+      if (count > maxVotes) {
+        maxVotes = count;
+        mostUpvoted = { content: a.content, side: a.side, author: a.author?.username, voteCount: count };
+      }
+    });
+
+    res.json({
+      debate,
+      stats: {
+        forCount: forArgs.length,
+        againstCount: againstArgs.length,
+        forAvgScore: avgScore(forArgs),
+        againstAvgScore: avgScore(againstArgs),
+        mostUpvoted,
+      },
+      aiSummary: debate.aiSummary,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error.', error: error.message });
+  }
+};
+
+module.exports = { createDebate, getDebates, getDebateByRoom, joinDebate, getArguments, closeDebate, getDebateStats };

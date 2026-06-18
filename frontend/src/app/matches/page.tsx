@@ -72,10 +72,15 @@ export default function MatchesPage() {
             <p className="text-gray-500 text-sm">Timed rounds · AI moderator · Final verdict</p>
           </div>
           <div className="flex items-center gap-4">
-            <button onClick={() => router.push('/debates')} className="text-gray-400 hover:text-white text-sm transition-colors">
-              ← Practice Mode
+            <button onClick={() => router.push('/home')} className="text-gray-400 hover:text-white text-sm transition-colors">
+              ← Home
             </button>
-            <span className="text-gray-400">Hello, {user?.username}</span>
+            <button onClick={() => router.push('/leaderboard')} className="text-yellow-400 hover:text-yellow-300 text-sm transition-colors">
+              🏆 Leaderboard
+            </button>
+            <button onClick={() => router.push(`/profile/${user?.username}`)} className="text-gray-400 hover:text-white transition-colors">
+              Hello, {user?.username}
+            </button>
             <button onClick={logout} className="text-gray-400 hover:text-white transition-colors">
               Logout
             </button>

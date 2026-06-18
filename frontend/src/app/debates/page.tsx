@@ -77,10 +77,15 @@ export default function DebatesPage() {
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <h1 className="text-2xl font-bold">DebateSphere</h1>
           <div className="flex items-center gap-4">
-            <button onClick={() => router.push('/matches')} className="text-purple-400 hover:text-purple-300 text-sm transition-colors">
-              Competitive Mode →
+            <button onClick={() => router.push('/home')} className="text-gray-400 hover:text-white text-sm transition-colors">
+              ← Home
             </button>
-            <span className="text-gray-400">Hello, {user?.username}</span>
+            <button onClick={() => router.push('/leaderboard')} className="text-yellow-400 hover:text-yellow-300 text-sm transition-colors">
+              🏆 Leaderboard
+            </button>
+            <button onClick={() => router.push(`/profile/${user?.username}`)} className="text-gray-400 hover:text-white transition-colors">
+              Hello, {user?.username}
+            </button>
             <button onClick={logout} className="text-gray-400 hover:text-white transition-colors">
               Logout
             </button>

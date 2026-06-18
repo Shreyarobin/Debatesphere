@@ -29,6 +29,8 @@ export default function DebateRoomPage() {
   const [newArg, setNewArg] = useState('');
   const [side, setSide] = useState<'for' | 'against'>('for');
   const [notification, setNotification] = useState('');
+  const [isSpectator, setIsSpectator] = useState(false);
+  const [roomPopulation, setRoomPopulation] = useState(0);
   const socket = getSocket();
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -37,14 +39,21 @@ export default function DebateRoomPage() {
 
     api.get(`/debates/${roomCode}`).then(({ data }) => {
       setDebate(data);
-      if (data.participants?.for?._id === user.id) setSide('for');
-      else if (data.participants?.against?._id === user.id) setSide('against');
+      if (data.participants?.for?._id === user.id) {
+        setSide('for');
+        setIsSpectator(false);
+      } else if (data.participants?.against?._id === user.id) {
+        setSide('against');
+        setIsSpectator(false);
+      } else {
+        setIsSpectator(true);
+      }
     });
 
     api.get(`/debates/${roomCode}/arguments`).then(({ data }) => setArguments(data));
 
     socket.connect();
-    socket.emit('join_room', { roomCode, username: user.username });
+    socket.emit('join_room', { roomCode, username: user.username, isSpectator });
 
     socket.on('new_argument', (arg: ArgumentItem) => {
       setArguments((prev) => [...prev, { ...arg, voteCount: 0 }]);
@@ -67,6 +76,10 @@ export default function DebateRoomPage() {
       setTimeout(() => setNotification(''), 3000);
     });
 
+    socket.on('room_population', ({ count }) => {
+      setRoomPopulation(count);
+    });
+
     socket.on('error', ({ message }) => alert(message));
 
     return () => {
@@ -74,6 +87,7 @@ export default function DebateRoomPage() {
       socket.off('argument_scored');
       socket.off('vote_updated');
       socket.off('user_joined');
+      socket.off('room_population');
       socket.off('error');
       socket.disconnect();
     };
@@ -101,6 +115,16 @@ export default function DebateRoomPage() {
     socket.emit('vote', { roomCode, argumentId, userId: user.id });
   };
 
+  const endDebate = async () => {
+    if (!confirm('Are you sure you want to end this debate? This cannot be undone.')) return;
+    try {
+      await api.post(`/debates/${roomCode}/close`);
+      router.push(`/debates/${roomCode}/results`);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to end debate.');
+    }
+  };
+
   const forArgs = arguments_.filter((a) => a.side === 'for');
   const againstArgs = arguments_.filter((a) => a.side === 'against');
 
@@ -117,6 +141,16 @@ export default function DebateRoomPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {isSpectator && (
+              <span className="px-3 py-1 rounded-full text-sm font-medium bg-blue-900/50 text-blue-400">
+                👁️ Spectating
+              </span>
+            )}
+            {roomPopulation > 0 && (
+              <span className="px-3 py-1 rounded-full text-sm font-medium bg-gray-800 text-gray-400">
+                👥 {roomPopulation}
+              </span>
+            )}
             <span className={`px-3 py-1 rounded-full text-sm font-medium ${
               debate?.status === 'active' ? 'bg-green-900/50 text-green-400' :
               debate?.status === 'waiting' ? 'bg-yellow-900/50 text-yellow-400' :
@@ -124,6 +158,14 @@ export default function DebateRoomPage() {
             }`}>
               {debate?.status?.toUpperCase()}
             </span>
+            {!isSpectator && debate?.creator?._id === user?.id && debate?.status !== 'closed' && (
+              <button
+                onClick={endDebate}
+                className="bg-red-900/50 hover:bg-red-900/80 text-red-400 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+              >
+                End Debate
+              </button>
+            )}
             <button onClick={() => router.push('/debates')} className="text-gray-400 hover:text-white text-sm transition-colors">
               ← Back
             </button>
@@ -172,44 +214,53 @@ export default function DebateRoomPage() {
 
       <div ref={bottomRef} />
 
-      {/* Input area */}
-      <div className="flex-shrink-0 bg-gray-900 border-t border-gray-800 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex gap-3 items-center">
-          <div className="flex gap-2">
+      {/* Input area — hidden for spectators */}
+      {!isSpectator && (
+        <div className="flex-shrink-0 bg-gray-900 border-t border-gray-800 px-6 py-4">
+          <div className="max-w-7xl mx-auto flex gap-3 items-center">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setSide('for')}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  side === 'for' ? 'bg-green-900/50 text-green-400 border border-green-700' : 'bg-gray-800 text-gray-400'
+                }`}
+              >
+                ✅ FOR
+              </button>
+              <button
+                onClick={() => setSide('against')}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  side === 'against' ? 'bg-red-900/50 text-red-400 border border-red-700' : 'bg-gray-800 text-gray-400'
+                }`}
+              >
+                ❌ AGAINST
+              </button>
+            </div>
+            <input
+              value={newArg}
+              onChange={(e) => setNewArg(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && submitArgument()}
+              placeholder="Type your argument and press Enter..."
+              className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+            />
             <button
-              onClick={() => setSide('for')}
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                side === 'for' ? 'bg-green-900/50 text-green-400 border border-green-700' : 'bg-gray-800 text-gray-400'
-              }`}
+              onClick={submitArgument}
+              className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg font-medium transition-colors"
             >
-              ✅ FOR
-            </button>
-            <button
-              onClick={() => setSide('against')}
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                side === 'against' ? 'bg-red-900/50 text-red-400 border border-red-700' : 'bg-gray-800 text-gray-400'
-              }`}
-            >
-              ❌ AGAINST
+              Submit
             </button>
           </div>
-          <input
-            value={newArg}
-            onChange={(e) => setNewArg(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && submitArgument()}
-            placeholder="Type your argument and press Enter..."
-            className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
-          />
-          <button
-            onClick={submitArgument}
-            className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg font-medium transition-colors"
-          >
-            Submit
-          </button>
         </div>
-      </div>
+      )}
 
-      {debate && <PrepChatbot topic={debate.title} side={side} />}
+      {/* Spectator footer — shown instead of input */}
+      {isSpectator && (
+        <div className="flex-shrink-0 bg-gray-900 border-t border-gray-800 px-6 py-4 text-center">
+          <p className="text-gray-500 text-sm">👁️ You're watching this debate. Vote on arguments using the 👍 button.</p>
+        </div>
+      )}
+
+      {debate && !isSpectator && <PrepChatbot topic={debate.title} side={side} />}
     </div>
   );
 }

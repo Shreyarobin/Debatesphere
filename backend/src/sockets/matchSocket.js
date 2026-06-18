@@ -14,15 +14,26 @@ const ROUND_LABELS = {
 const matchSocket = (io) => {
   io.on('connection', (socket) => {
 
-    socket.on('join_match', ({ roomCode, username }) => {
-      socket.join(roomCode);
-      console.log(`${username} joined match ${roomCode}`);
-      socket.to(roomCode).emit('match_user_joined', {
-        message: `${username} has joined the match`,
-        timestamp: new Date(),
-      });
-    });
+    socket.on('join_match', ({ roomCode, username, isSpectator }) => {
+  socket.join(roomCode);
+  console.log(`${username} joined match ${roomCode}${isSpectator ? ' as spectator' : ''}`);
 
+  if (isSpectator) {
+    socket.to(roomCode).emit('match_user_joined', {
+      message: `${username} is now watching this match`,
+      timestamp: new Date(),
+    });
+  } else {
+    socket.to(roomCode).emit('match_user_joined', {
+      message: `${username} has joined the match`,
+      timestamp: new Date(),
+    });
+  }
+
+  const room = io.sockets.adapter.rooms.get(roomCode);
+  const roomSize = room ? room.size : 0;
+  io.to(roomCode).emit('match_population', { count: roomSize });
+});
     // Host starts the match — triggers round 1
     socket.on('start_match', async ({ roomCode, matchId }) => {
       try {

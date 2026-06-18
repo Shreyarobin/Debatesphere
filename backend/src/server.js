@@ -11,6 +11,9 @@ const authRoutes = require('./routes/authRoutes');
 const debateRoutes = require('./routes/debateRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const matchRoutes = require('./routes/matchRoutes');
+const profileRoutes = require('./routes/profileRoutes');
+const leaderboardRoutes = require('./routes/leaderboardRoutes');
+const soloRoutes = require('./routes/soloRoutes');
 const debateSocket = require('./sockets/debateSocket');
 const matchSocket = require('./sockets/matchSocket');
 const { initializeRAG } = require('./services/ragService');
@@ -25,6 +28,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/debates', debateRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/matches', matchRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/solo', soloRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'OK', timestamp: new Date() }));
 

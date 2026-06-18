@@ -20,7 +20,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await register(username, email, password);
-      router.push('/debates');
+      router.push('/home');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Registration failed');
     } finally {
