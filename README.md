@@ -1,8 +1,8 @@
 # DebateSphere 🌐⚔️
 
-> **⚠️ Work in Progress** — This project is under active development. The core platform, both debate modes, and the AI layer are functional and tested, but several planned features (spectator mode, profiles, leaderboards, mobile UI, moderation, deployment) are not yet built. Expect frequent changes, incomplete edges, and breaking changes between sessions.
+> **⚠️ Work in Progress** — This project is under active development. Three full debate experiences, the entire AI layer, and a complete identity/progression system (profiles, history, leaderboard) are functional and tested. Mobile responsiveness, content moderation, and a public social feed are not yet built, and deployment is intentionally saved for last. Expect frequent changes between sessions.
 
-A real-time debate platform built around **two distinct modes**: a free-form **Practice Mode** for honing arguments with instant AI feedback, and a structured **Competitive Mode** where an AI moderator runs a timed, Oxford-style match and delivers a final verdict — like a debate referee. Built end-to-end as a learning project to explore full-stack architecture, real-time systems, and applied AI (RAG + memory) without relying on paid APIs.
+A real-time debate platform built around **three distinct ways to debate**: practice solo against an AI opponent and get a coaching report, go free-form against another person with live AI scoring and an AI prep coach, or compete head-to-head in a structured, timed Oxford-style match with an AI moderator and a final AI verdict. Built end-to-end as a learning project to explore full-stack architecture, real-time systems, and applied AI (RAG, memory, and multi-persona AI behavior) without relying on paid APIs.
 
 ---
 
@@ -12,11 +12,21 @@ A real-time debate platform built around **two distinct modes**: a free-form **P
 | Feature | Status |
 |---|---|
 | User registration & login (JWT + refresh tokens) | ✅ Working |
-| MongoDB schemas (User, Debate, Argument, Vote, CompetitiveMatch, MatchMessage) | ✅ Working |
+| MongoDB schemas (User, Debate, Argument, Vote, CompetitiveMatch, MatchMessage, SoloSession) | ✅ Working |
 | Redis pub/sub adapter for Socket.io (horizontal scaling ready) | ✅ Working |
 | Real-time WebSocket communication | ✅ Working |
+| `/home` landing hub + `/practice` sub-choice page after login | ✅ Working |
 
-### Practice Mode
+### Practice Mode — Solo vs AI
+| Feature | Status |
+|---|---|
+| Pick a topic and a side, AI argues the opposite | ✅ Working |
+| 3-minute timed round, live back-and-forth chat with AI opponent | ✅ Working |
+| AI generates sharp, on-topic rebuttals each turn | ✅ Working |
+| AI-generated strengths & weaknesses coaching report at the end | ✅ Working |
+| No prep assistance in this mode (intentional — it's the test, not the practice) | ✅ Working |
+
+### Practice Mode — With a Competitor
 | Feature | Status |
 |---|---|
 | Create/join free-form FOR vs AGAINST debate rooms | ✅ Working |
@@ -25,10 +35,10 @@ A real-time debate platform built around **two distinct modes**: a free-form **P
 | AI argument quality scoring (0–10) via Groq | ✅ Working |
 | Logical fallacy detection | ✅ Working |
 | **Stance-aware scoring** — penalizes well-written arguments posted on the *wrong* side | ✅ Working |
-| AI Debate Prep Chatbot (streaming) | ✅ Working |
-| → Retrieval-Augmented Generation (RAG) over a local debate knowledge dataset | ✅ Working |
-| → Memory module — chatbot adapts advice based on a user's own past argument history | ✅ Working |
-| Post-debate AI summary generator | ⚠️ Built, not yet wired into the frontend UI |
+| AI Debate Prep Chatbot (streaming, RAG + memory powered) | ✅ Working |
+| Spectator mode — watch live, vote, without participating | ✅ Working |
+| Explicit join-vs-watch choice screen on entering a room | ✅ Working |
+| "End Debate" + post-debate stats page (avg scores, most-upvoted, AI summary) | ✅ Working |
 
 ### Competitive Mode
 | Feature | Status |
@@ -38,21 +48,25 @@ A real-time debate platform built around **two distinct modes**: a free-form **P
 | Live synced countdown timer per round | ✅ Working |
 | AI Moderator — announces round transitions automatically in-chat | ✅ Working |
 | Chat-style transcript (FOR / AGAINST / Moderator, visually distinct) | ✅ Working |
-| Automatic round advancement when timer hits zero | ✅ Working |
-| AI Judge — reviews the full transcript holistically after all rounds end | ✅ Working |
-| Final verdict: winner, per-side score (0–10), AI reasoning | ✅ Working |
+| AI Judge — reviews the full transcript holistically, delivers winner + scores + reasoning | ✅ Working |
+| Spectator mode with live population counter | ✅ Working |
 | Match summary screen with full transcript replay | ✅ Working |
+
+### Identity & Progression
+| Feature | Status |
+|---|---|
+| User profiles (`/profile/[username]`) | ✅ Working |
+| Cross-mode stats: Practice avg score, debate count, Competitive W/L/T record | ✅ Working |
+| Clickable debate & match history linking back to past rooms | ✅ Working |
+| Leaderboard — ranked by avg AI score (Practice) and wins (Competitive) | ✅ Working |
 
 ### Not Yet Built
 | Feature | Status |
 |---|---|
-| Spectator / audience mode (watch + vote without participating) | 🔜 Planned |
-| Post-debate stats page for Practice Mode | 🔜 Planned |
-| User profiles + debate/match history | 🔜 Planned |
-| Leaderboard | 🔜 Planned |
 | Mobile responsive UI | 🔜 Planned |
 | Content moderation + rate limiting | 🔜 Planned |
-| Public debate feed + social features | 🔜 Planned |
+| Public debate feed + follow/comment system | 🔜 Planned |
+| Solo Practice sessions reflected in profile/leaderboard | 🔜 Planned |
 | Docker Compose, CI/CD, production deployment | 🔜 Planned (intentionally last) |
 
 ---
@@ -77,13 +91,13 @@ A real-time debate platform built around **two distinct modes**: a free-form **P
 
 ## 🧠 How the AI Layer Works
 
-DebateSphere deliberately avoids paid AI APIs. All intelligence is powered by **Groq** (free tier, Llama 3.3 70B) combined with a self-built retrieval and memory system, inspired by patterns from a prior personal project (CoachLM, an AI interview coach):
+DebateSphere deliberately avoids paid AI APIs. All intelligence runs on **Groq** (free tier, Llama 3.3 70B) combined with a self-built retrieval and memory system. The AI plays five distinct roles across the app:
 
-1. **Stance-aware scoring** — Before grading argument quality, the AI first checks whether the argument actually supports the side it was posted under. A well-written argument posted on the wrong side scores 0–2, with the mismatch clearly flagged in the UI.
-2. **RAG (Retrieval-Augmented Generation)** — A curated local dataset of debate techniques, rhetorical strategies, and logical fallacies is embedded using `@xenova/transformers` (runs locally, free). The prep chatbot retrieves the most relevant entries via cosine similarity before responding.
-3. **Memory** — The chatbot reads a user's own past arguments and AI scores from MongoDB and summarizes their tendencies (e.g. "frequently commits appeal-to-emotion fallacies") to give personalized coaching advice.
-4. **AI Moderator** — In Competitive Mode, the AI announces round transitions in the live chat feed, acting as a referee rather than a participant.
-5. **AI Judge** — After all rounds complete, the AI reviews the entire match transcript holistically (not argument-by-argument) and produces a winner, scores, and written reasoning — similar to a real debate judge's verdict.
+1. **Stance-aware scorer** — Before grading argument quality, checks whether the argument actually supports the side it was posted under. A well-written argument posted on the wrong side scores 0–2, with the mismatch flagged in the UI.
+2. **Prep coach (RAG + Memory)** — A curated local dataset of debate techniques and fallacies is embedded with `@xenova/transformers` (runs locally, free) and retrieved via cosine similarity. The coach also reads a user's own past arguments and scores from MongoDB to personalize advice — e.g. warning a user who frequently commits appeal-to-emotion fallacies.
+3. **AI opponent (Solo Mode)** — Argues the opposite side of whatever topic the user picks, generating direct, punchy rebuttals turn-by-turn within a 3-minute timer.
+4. **AI moderator** — In Competitive Mode, announces round transitions in the live chat feed, acting as a referee rather than a participant.
+5. **AI judge / coach** — After a Competitive match, holistically reviews the full transcript and produces a winner, scores, and reasoning. After a Solo session, the same holistic-review pattern instead produces a strengths/weaknesses coaching report.
 
 ---
 
@@ -93,13 +107,13 @@ DebateSphere deliberately avoids paid AI APIs. All intelligence is powered by **
 debatesphere/
 ├── backend/
 │   └── src/
-│       ├── models/          # User, Debate, Argument, Vote, CompetitiveMatch, MatchMessage
-│       ├── controllers/     # Route handlers (auth, debates, matches)
-│       ├── routes/          # Express routes (auth, debates, matches, AI)
+│       ├── models/          # User, Debate, Argument, Vote, CompetitiveMatch, MatchMessage, SoloSession
+│       ├── controllers/     # auth, debates, matches, solo, profile, leaderboard
+│       ├── routes/          # Express routes matching each controller
 │       ├── middleware/      # JWT auth middleware
-│       ├── sockets/         # debateSocket.js (Practice Mode), matchSocket.js (Competitive Mode)
+│       ├── sockets/         # debateSocket.js (Practice w/ Competitor), matchSocket.js (Competitive)
 │       └── services/
-│           ├── openaiService.js     # All Groq calls: scoring, chatbot, summary, judging
+│           ├── openaiService.js     # All Groq calls: scoring, chatbot, summary, judging, AI opponent, solo report
 │           ├── ragService.js        # Local embeddings + cosine similarity search
 │           ├── memoryService.js     # Reads user history from MongoDB
 │           └── debateDataset.js     # Hardcoded debate knowledge base for RAG
@@ -107,11 +121,18 @@ debatesphere/
     └── src/
         ├── app/
         │   ├── login/, register/
-        │   ├── debates/              # Practice Mode lobby + room
-        │   │   └── [roomCode]/PrepChatbot.tsx
-        │   └── matches/              # Competitive Mode lobby + room
-        ├── context/                 # Auth context
-        └── lib/                     # Axios + Socket.io clients
+        │   ├── home/                 # Post-login hub: choose Practice or Competitive
+        │   ├── practice/             # Choose Solo vs AI or With a Competitor
+        │   │   └── solo/             # 3-min timed solo debate vs AI + report
+        │   ├── debates/               # Practice w/ Competitor lobby + room
+        │   │   └── [roomCode]/
+        │   │       ├── PrepChatbot.tsx
+        │   │       └── results/      # Post-debate stats page
+        │   ├── matches/               # Competitive Mode lobby + room
+        │   ├── profile/[username]/
+        │   └── leaderboard/
+        ├── context/                  # Auth context
+        └── lib/                      # Axios + Socket.io clients
 ```
 
 ---
@@ -182,12 +203,9 @@ Then open `http://localhost:3000`.
 
 ## 🗺️ Roadmap
 
-- [ ] Spectator mode for both Practice and Competitive rooms
-- [ ] Post-debate stats/summary page for Practice Mode (wire up the existing summary generator)
-- [ ] User profiles with debate/match history
-- [ ] Leaderboard (by score, wins, votes)
-- [ ] Mobile responsive redesign
-- [ ] Content moderation + rate limiting
+- [ ] Mobile responsive redesign across all pages
+- [ ] Content moderation + rate limiting (spam protection, report system)
+- [ ] Fold Solo Practice stats into profiles and the leaderboard
 - [ ] Public debate feed + follow/comment system
 - [ ] Docker Compose for one-command setup
 - [ ] Deploy backend to Render, frontend to Vercel
@@ -197,6 +215,6 @@ Then open `http://localhost:3000`.
 
 ## 👩‍💻 Author
 
-Built by **Shreya Robin** as a personal project to learn full-stack development, real-time architecture with Socket.io and Redis, and practical AI integration (RAG, memory, and LLM-driven game logic) without relying on paid APIs.
+Built by **Shreya Robin** as a personal project to learn full-stack development, real-time architecture with Socket.io and Redis, and practical AI integration (RAG, memory, multi-persona LLM behavior, and game/coaching logic) without relying on paid APIs.
 
-> This project is actively evolving — features are being added in focused sessions, one phase at a time. If you're viewing this on a particular day, check the table above for what's actually working versus what's still planned.
+> This project is actively evolving — features are being added in focused sessions, one phase at a time. If you're viewing this on a particular day, check the tables above for what's actually working versus what's still planned.
